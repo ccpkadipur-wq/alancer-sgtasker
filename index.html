@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Alancer-SGTasker - Ultimate Multiple Wallets</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Monetag Meta -->
+    <meta name="monetag" content="e98fadf7f9349378e441e2db2495ce48">
+
+    <!-- Monetag Daily Checking SDK -->
+    <script src="//libtl.com/sdk.js" data-zone="10202760" data-sdk="show_10202760"></script>
+    <!-- Ads will be injected dynamically after login -->
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-light: #64748b;
+            --accent: #f59e0b;
+        }
+        
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh; width: 100vw; overflow: hidden;
+            margin: 0; padding: 0;
+        }
+
+        .app-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            overflow-y: auto; background: var(--bg-color);
+            display: none; flex-direction: column;
+            opacity: 0; transform: translateY(10px); transition: all 0.3s ease;
+            padding-bottom: 90px;
+        }
+        .app-screen.active { display: flex; opacity: 1; transform: translateY(0); z-index: 10; }
+        
+        .task-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.95); color: white; z-index: 5000;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .custom-card {
+            background: var(--card-bg); border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); padding: 20px;
+            margin-bottom: 16px; border: 1px solid #f1f5f9;
+        }
+        
+        .wallet-card {
+            border-radius: 20px; padding: 20px; margin-bottom: 15px; color: white;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1); position: relative; overflow: hidden;
+        }
+        .bg-gradient-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+        .bg-gradient-warning { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+        .bg-gradient-success { background: linear-gradient(135deg, #10b981, #3b82f6); }
+        .bg-gradient-dark { background: linear-gradient(135deg, #334155, #0f172a); }
+
+        .task-item {
+            background: white; border-radius: 16px; padding: 16px;
+            margin-bottom: 12px; display: flex; align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03); cursor: pointer;
+            border: 1px solid #f1f5f9;
+        }
+        
+        .icon-box {
+            width: 50px; height: 50px; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; margin-right: 16px; color: white;
+        }
+
+        .bottom-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: white; height: 75px;
+            box-shadow: 0 -5px 25px rgba(0,0,0,0.05);
+            display: flex; justify-content: space-around; align-items: center;
+            border-top-left-radius: 24px; border-top-right-radius: 24px; z-index: 100;
+        }
+        .nav-btn {
+            display: flex; flex-direction: column; align-items: center;
+            color: #94a3b8; font-size: 0.75rem; background: none; border: none;
+        }
+        .nav-btn i { font-size: 1.5rem; margin-bottom: 4px; }
+        .nav-btn.active { color: var(--primary); font-weight: 600; }
+
+        .auth-container { height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 30px; background: white; }
+        .form-control { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 15px; }
+        .btn-main { background: var(--primary); color: white; width: 100%; padding: 14px; border-radius: 12px; font-weight: 600; border: none; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+
+        .loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9); z-index: 9999;
+            display: none; justify-content: center; align-items: center; flex-direction: column;
+        }
+        .msg-box { background: white; padding: 25px; border-radius: 24px; width: 90%; max-width: 350px; text-align: center; color: #333; }
+        
+        .battery-container { width: 100%; height: 30px; background: #e2e8f0; border-radius: 15px; overflow: hidden; position: relative; margin-top: 10px; }
+        .battery-level { height: 100%; background: #10b981; width: 0%; transition: width 0.3s; }
+        .spin-wheel { width: 250px; height: 250px; border-radius: 50%; border: 10px solid #cbd5e1; background: conic-gradient(#f59e0b 0 60deg, #ef4444 60deg 120deg, #3b82f6 120deg 180deg, #10b981 180deg 240deg, #8b5cf6 240deg 300deg, #ec4899 300deg 360deg); transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1); }
+        
+        /* Ads styling */
+        .ad-container { width: 100%; overflow: hidden; text-align: center; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+    <div id="globalLoader" class="loader-overlay">
+        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+        <h5 class="fw-bold">Loading...</h5>
+    </div>
+
+    <!-- AUTH SCREENS -->
+    <div id="screenWelcome" class="app-screen active" style="justify-content:center; align-items:center; background:white;">
+        <div class="text-center">
+            <h1 class="fw-bold mb-2">Alancer-SGTasker</h1>
+            <p class="text-muted mb-5">Complete Tasks, Earn Wallets</p>
+            <button class="btn-main mb-3" style="width:250px;" onclick="navTo('screenLogin')">Login</button>
+            <button class="btn btn-outline-primary" style="width:250px; border-radius:12px; padding:12px;" onclick="navTo('screenRegister')">Create Account</button>
+        </div>
+    </div>
+
+    <div id="screenLogin" class="app-screen">
+        <div class="auth-container">
+            <h2 class="fw-bold mb-1">Welcome Back!</h2>
+            <form id="formLogin" class="mt-4">
+                <input type="email" class="form-control" id="loginEmail" placeholder="Email" required>
+                <input type="password" class="form-control" id="loginPass" placeholder="Password" required>
+                <button type="submit" class="btn-main mt-2">Login</button>
+            </form>
+            <p class="text-center mt-4">New here? <span class="text-primary fw-bold" onclick="navTo('screenRegister')">Register</span></p>
+        </div>
+    </div>
+
+    <div id="screenRegister" class="app-screen">
+        <div class="auth-container">
+            <h2 class="fw-bold mb-1">Create Account</h2>
+            <form id="formRegister" class="mt-4">
+                <input type="text" class="form-control" id="regName" placeholder="Full Name" required>
+                <input type="email" class="form-control" id="regEmail" placeholder="Email Address" required>
+                <input type="password" class="form-control" id="regPass" placeholder="Create Password" required>
+                <input type="text" class="form-control border-success" id="regRef" placeholder="Referral Code (Optional)">
+                <button type="submit" class="btn-main mt-2">Sign Up</button>
+            </form>
+            <p class="text-center mt-4">Have an account? <span class="text-primary fw-bold" onclick="navTo('screenLogin')">Login</span></p>
+        </div>
+    </div>
+
+    <!-- HOME SCREEN -->
+    <div id="screenHome" class="app-screen">
+        <div class="container pt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="fw-bold mb-0">Hi, <span id="userNameDisplay">User</span></h5>
+                    <small class="badge bg-primary mt-1" id="userMembershipDisplay">Level 1</small>
+                </div>
+                <div class="d-flex gap-3">
+                    <div class="bg-white p-2 rounded-circle shadow-sm position-relative" onclick="window.open('https://mokonotification.blogspot.com/', '_blank')">
+                        <i class="fas fa-bell text-warning"></i>
+                        <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                    </div>
+                    <div class="bg-white p-2 rounded-circle shadow-sm" onclick="navTo('screenProfile')"><i class="fas fa-user text-primary"></i></div>
+                </div>
+            </div>
+
+            <!-- Ads Banner -->
+            <div class="ad-container">
+                <script>
+                  atOptions = { 'key' : '52783548816a6fe0bd1e493e59c48bfa', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
+                </script>
+                <script src="https://www.highperformanceformat.com/52783548816a6fe0bd1e493e59c48bfa/invoke.js"></script>
+            </div>
+
+            <!-- Point Balance Wallet (Main) -->
+            <div class="wallet-card bg-gradient-primary">
+                <small class="opacity-75">Point Balance Wallet (Withdrawal Ready)</small>
+                <h2 class="fw-bold mt-1 mb-0" id="mainPointBalance">0</h2>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-6 pe-2">
+                    <div class="wallet-card bg-gradient-warning mb-0" style="padding: 15px;">
+                        <small class="opacity-75" style="font-size:10px;">Pending Balance</small>
+                        <h4 class="fw-bold mb-0" id="pendingPointBalance">0</h4>
+                    </div>
+                </div>
+                <div class="col-6 ps-2">
+                    <div class="wallet-card bg-gradient-success mb-0" style="padding: 15px;">
+                        <small class="opacity-75" style="font-size:10px;">Day Earning (24h)</small>
+                        <h4 class="fw-bold mb-0" id="dayEarningBalance">0</h4>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="fw-bold text-secondary mt-3 mb-3">Today's Tasks</h6>
+
+            <div class="task-item" onclick="startDailyCheck()">
+                <div class="icon-box" style="background:#f59e0b;"><i class="fas fa-calendar-check"></i></div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-0">Daily Checking</h6>
+                    <small class="text-muted">Earn 5 Points</small>
+                </div>
+                <span class="badge bg-light text-dark">Play</span>
+            </div>
+
+            <div class="task-item" onclick="navTo('screenClickEarn')">
+                <div class="icon-box" style="background:#3b82f6;"><i class="fas fa-mouse-pointer"></i></div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-0">Click & Earn</h6>
+                    <small class="text-muted">Limit: <span id="limitClickEarn">0</span></small>
+                </div>
+                <i class="fas fa-chevron-right text-muted"></i>
+            </div>
+
+            <div class="task-item" onclick="navTo('screenSpinEarn')">
+                <div class="icon-box" style="background:#10b981;"><i class="fas fa-dharmachakra"></i></div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-0">Spin & Earn</h6>
+                    <small class="text-muted">Charge Battery to Spin</small>
+                </div>
+                <i class="fas fa-chevron-right text-muted"></i>
+            </div>
+            
+            <div class="task-item" onclick="navTo('screenTasksList')">
+                <div class="icon-box" style="background:#8b5cf6;"><i class="fas fa-list-ul"></i></div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-0">More Tasks</h6>
+                    <small class="text-muted">Social, Reward, Clock Click</small>
+                </div>
+                <i class="fas fa-chevron-right text-muted"></i>
+            </div>
+
+            <div class="task-item" onclick="navTo('screenMegaOffer')">
+                <div class="icon-box" style="background:#ec4899;"><i class="fas fa-fire"></i></div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-0">Mega Offer Wall</h6>
+                    <small class="text-muted">High Paying Offers</small>
+                </div>
+                <i class="fas fa-chevron-right text-muted"></i>
+            </div>
+            
+            <!-- Native Ads -->
+            <div class="ad-container mt-3">
+                <script async="async" data-cfasync="false" src="https://pl29225116.profitablecpmratenetwork.com/82dbbcf2995fc608b92223f49971c0f4/invoke.js"></script>
+                <div id="container-82dbbcf2995fc608b92223f49971c0f4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MORE TASKS SCREEN -->
+    <div id="screenTasksList" class="app-screen">
+        <div class="container pt-4">
+            <div class="d-flex align-items-center mb-4">
+                <i class="fas fa-arrow-left me-3 text-muted fs-5" onclick="navTo('screenHome')"></i>
+                <h5 class="fw-bold mb-0">Extra Tasks</h5>
+            </div>
+
+            <div class="task-item" onclick="startSocialTask()">
+                <div class="icon-box" style="background:#e11d48;"><i class="fas fa-share-alt"></i></div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-0">Social Task (2 Pts)</h6>
+                    <small class="text-muted">Limit: <span id="limitSocial">0</span></small>
+                </div>
+            </div>
+
+            <div class="task-item" onclick="startRewardTask()">
+                <div class="icon-box" style="background:#0284c7;"><i class="fas fa-gift"></i></div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-0">Reward Task (3 Pts)</h6>
+                    <small class="text-muted">Limit: <span id="limitReward">0</span></small>
+                </div>
+            </div>
+
+            <div class="task-item" onclick="startClockClickTask()">
+                <div class="icon-box" style="background:#059669;"><i class="fas fa-clock"></i></div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-0">Clock Click Task (1 Pt)</h6>
+                    <small class="text-muted">Timer based task</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLICK AND EARN SCREEN -->
+    <div id="screenClickEarn" class="app-screen">
+        <div class="container pt-4 text-center">
+            <div class="d-flex align-items-center mb-4 text-start">
+                <i class="fas fa-arrow-left me-3 text-muted fs-5" onclick="navTo('screenHome')"></i>
+                <h5 class="fw-bold mb-0">Click & Earn</h5>
+            </div>
+            
+            <div class="custom-card">
+                <h2 class="fw-bold text-primary" id="clickEarnCreditsDisplay">0</h2>
+                <p class="text-muted small">Current Credits (100 Credits = 1 Point)</p>
+                <p class="text-muted small">Daily Limit Remaining: <span id="clickEarnLimitDisplay" class="fw-bold">0</span></p>
+                
+                <button class="btn-main mt-3" id="btnClickEarnVisit" onclick="doClickEarnVisit()">Visit Link & Earn Credit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SPIN AND EARN SCREEN -->
+    <div id="screenSpinEarn" class="app-screen">
+        <div class="container pt-4 text-center">
+            <div class="d-flex align-items-center mb-4 text-start">
+                <i class="fas fa-arrow-left me-3 text-muted fs-5" onclick="navTo('screenHome')"></i>
+                <h5 class="fw-bold mb-0">Spin & Earn</h5>
+            </div>
+
+            <div class="custom-card">
+                <h6 class="fw-bold">Battery Charger</h6>
+                <div class="battery-container mb-2">
+                    <div class="battery-level" id="batteryLevelBar"></div>
+                </div>
+                <p class="small text-muted"><span id="batteryChargeText">0/10</span> Links Visited</p>
+                <button class="btn btn-dark w-100 mb-3" onclick="chargeBattery()">Visit Link (5s) to Charge</button>
+                
+                <hr>
+                <div class="d-flex justify-content-center my-4">
+                    <div class="spin-wheel" id="spinWheelElement"></div>
+                </div>
+                
+                <p class="small text-warning fw-bold">Cost: 100 Referral Points per Spin</p>
+                <button class="btn-main" id="btnSpin" onclick="playSpin()" disabled>SPIN NOW</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MEGA OFFER SCREEN -->
+    <div id="screenMegaOffer" class="app-screen">
+        <div class="container pt-4">
+            <div class="d-flex align-items-center mb-4 text-start">
+                <i class="fas fa-arrow-left me-3 text-muted fs-5" onclick="navTo('screenHome')"></i>
+                <h5 class="fw-bold mb-0">Mega Offer Wall</h5>
+            </div>
+            <div class="alert alert-info small">Offers completed here will go to Pending Wallet for 84 hours before moving to Point Balance.</div>
+            
+            <!-- MyLead API Placeholder -->
+            <div id="mylead-offerwall-container" class="custom-card text-center py-5">
+                <i class="fas fa-plug fa-3x text-muted mb-3"></i>
+                <h6>MyLead Offer Wall API Integration</h6>
+                <p class="small text-muted mb-4">Currency Multiplier: $1 = 2500 Points</p>
+                <button class="btn btn-outline-primary" onclick="simulateOfferComplete()">Simulate Offer Complete (Demo)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WALLET SCREEN -->
+    <div id="screenWallet" class="app-screen">
+        <div class="container pt-4">
+            <h5 class="fw-bold mb-4">My Wallets</h5>
+            
+            <div class="wallet-card bg-gradient-primary">
+                <small class="opacity-75">Point Balance Wallet</small>
+                <h2 class="fw-bold mt-1 mb-0" id="wMainBalance">0</h2>
+                <button class="btn btn-light btn-sm mt-3 fw-bold text-primary" onclick="openWithdrawal()">Withdraw</button>
+            </div>
+
+            <div class="wallet-card bg-gradient-warning">
+                <small class="opacity-75">Point Balance Pending Wallet</small>
+                <h4 class="fw-bold mt-1 mb-0" id="wPendingBalance">0</h4>
+                <small class="d-block mt-2 opacity-75" style="font-size:11px;">Requires Admin Approval (approx 48-84 hrs)</small>
+            </div>
+
+            <div class="wallet-card bg-gradient-success">
+                <small class="opacity-75">Day Earning Balance</small>
+                <h4 class="fw-bold mt-1 mb-0" id="wDayEarning">0</h4>
+                <small class="d-block mt-2 opacity-75" style="font-size:11px;">Auto transfers to Point Balance after 24 hrs</small>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-6 pe-2">
+                    <div class="wallet-card bg-gradient-dark mb-0 p-3">
+                        <small class="opacity-75" style="font-size:11px;">Ref Wallet</small>
+                        <h5 class="fw-bold mb-0" id="wRefBal">0</h5>
+                    </div>
+                </div>
+                <div class="col-6 ps-2">
+                    <div class="wallet-card bg-gradient-dark mb-0 p-3">
+                        <small class="opacity-75" style="font-size:11px;">Pending Ref</small>
+                        <h5 class="fw-bold mb-0" id="wPendingRefBal">0</h5>
+                    </div>
+                </div>
+            </div>
+            <p class="small text-muted mt-2 px-1">Pending Referrals clear after referred user is active for 5 days.</p>
+        </div>
+    </div>
+
+    <!-- PROFILE SCREEN -->
+    <div id="screenProfile" class="app-screen">
+        <div class="container pt-4">
+            <h5 class="fw-bold mb-4">My Profile</h5>
+            <div class="custom-card text-center">
+                <div class="p-3 bg-primary rounded-circle mx-auto mb-3" style="width: 70px; height: 70px;"><i class="fas fa-user-circle fa-3x text-white"></i></div>
+                <h5 class="fw-bold mb-1" id="profileName">User</h5>
+                <p class="text-muted small mb-2" id="profileEmail">email@example.com</p>
+                <span class="badge bg-primary px-3 py-2" id="profileLevelDisplay">Level 1</span>
+            </div>
+
+            <h6 class="fw-bold text-secondary mt-4 mb-3">Subscription Plans</h6>
+            <div class="custom-card border-primary" style="border-width: 2px;">
+                <h6 class="fw-bold text-primary">Upgrade Membership</h6>
+                <p class="small text-muted mb-3">Increase daily limits and unlock withdrawals. Purchase using Referral Points.</p>
+                <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="buyMembership('Level 2')">Level 2 (Cost: 1000 Ref Pts)</button>
+                <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="buyMembership('Level 3')">Level 3 (Cost: 5000 Ref Pts)</button>
+                <button class="btn btn-sm btn-outline-primary w-100" onclick="buyMembership('Level 4')">Level 4 (Cost: 10000 Ref Pts)</button>
+            </div>
+
+            <div class="task-item mt-3" onclick="navTo('screenReferral')">
+                <div class="icon-box" style="background:#10b981; width:40px; height:40px;"><i class="fas fa-users fs-6"></i></div>
+                <h6 class="fw-bold mb-0 flex-grow-1">Referral System</h6>
+                <i class="fas fa-chevron-right text-muted"></i>
+            </div>
+
+            <div class="task-item mt-2" onclick="logout()">
+                <div class="icon-box" style="background:#ef4444; width:40px; height:40px;"><i class="fas fa-sign-out-alt fs-6"></i></div>
+                <h6 class="fw-bold mb-0 text-danger flex-grow-1">Logout</h6>
+            </div>
+        </div>
+    </div>
+    
+    <!-- REFERRAL SCREEN -->
+    <div id="screenReferral" class="app-screen">
+        <div class="container pt-4">
+            <div class="d-flex align-items-center mb-4 text-start">
+                <i class="fas fa-arrow-left me-3 text-muted fs-5" onclick="navTo('screenProfile')"></i>
+                <h5 class="fw-bold mb-0">Referral Program</h5>
+            </div>
+            
+            <div class="custom-card text-center">
+                <h4 class="fw-bold text-success mb-2">Invite & Earn</h4>
+                <p class="text-muted small mb-4">Share code. Pending points clear when friend is active 5 days.</p>
+                <div class="bg-light p-3 rounded-3 border-success border mb-3">
+                    <span class="fs-3 fw-bold text-primary" id="refCodeDisplay">LOADING...</span>
+                </div>
+                <button class="btn btn-primary w-100 mb-2" onclick="alert('Shared via Telegram')"><i class="fab fa-telegram me-2"></i> Share on Telegram</button>
+                <button class="btn btn-success w-100" onclick="alert('Shared via WhatsApp')"><i class="fab fa-whatsapp me-2"></i> Share on WhatsApp</button>
+            </div>
+            
+            <div class="custom-card">
+                <h6 class="fw-bold">Mega Referral Offer</h6>
+                <p class="small text-muted mb-2">Get 250 Bonus Points if you complete 100 referrals via Social Media (250 views required).</p>
+                <button class="btn btn-sm btn-outline-dark w-100" onclick="alert('Submit proof to Admin')">Submit Proof to Admin</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAYS -->
+    <div id="overlayTaskForm" class="task-overlay">
+        <div class="msg-box">
+            <h4 class="fw-bold mb-3" id="taskFormTitle">Task Verification</h4>
+            <p class="small text-muted" id="taskFormDesc">Enter verification code</p>
+            <input type="text" class="form-control text-center fw-bold fs-4" id="taskCodeInput" placeholder="CODE">
+            <button class="btn-main mt-2" onclick="submitTaskCode()">Verify & Claim</button>
+            <button class="btn btn-link text-muted w-100 mt-2" onclick="closeOverlay('overlayTaskForm')">Cancel</button>
+        </div>
+    </div>
+
+    <div id="overlayClockTask" class="task-overlay">
+        <div class="msg-box">
+            <h5 class="fw-bold mb-2">Clock Click Task</h5>
+            <div id="clockStep1">
+                <p class="small text-muted">Step 1: Get code from link</p>
+                <button class="btn btn-dark w-100 mb-3" onclick="window.open('https://stlisttask.blogspot.com/p/clock-click-task.html','_blank')">Open Link</button>
+                <input type="text" class="form-control text-center" id="clockCodeInput" placeholder="Enter Code">
+                <button class="btn-main mt-2" onclick="verifyClockCode()">Verify Code</button>
+            </div>
+            <div id="clockStep2" style="display:none;">
+                <h1 class="fw-bold text-primary my-3" id="clockTimerDisplay">05</h1>
+                <p class="small text-muted">Wait for unlock...</p>
+                <button class="btn-main mt-2" id="btnClockFinal" disabled onclick="finishClockTask()">Final Click & Ads</button>
+            </div>
+            <button class="btn btn-link text-muted w-100 mt-2" onclick="closeOverlay('overlayClockTask')">Cancel</button>
+        </div>
+    </div>
+
+    <div id="overlayDailyChecking" class="task-overlay">
+        <div class="msg-box">
+            <h5 class="fw-bold mb-3">Daily Checking</h5>
+            <p class="small text-muted">Complete 4 steps to get 5 Pts</p>
+            <button class="btn btn-primary w-100 mb-2" id="dc1" onclick="doDailyCheckingStep(1)">Step 1 - View Ad</button>
+            <button class="btn btn-secondary w-100 mb-2" id="dc2" disabled onclick="doDailyCheckingStep(2)">Step 2 - View Ad</button>
+            <button class="btn btn-secondary w-100 mb-2" id="dc3" disabled onclick="doDailyCheckingStep(3)">Step 3 - View Ad</button>
+            <button class="btn btn-secondary w-100 mb-2" id="dc4" disabled onclick="doDailyCheckingStep(4)">Step 4 - View Ad</button>
+            <button class="btn btn-link text-muted w-100 mt-2" onclick="closeOverlay('overlayDailyChecking')">Cancel</button>
+        </div>
+    </div>
+    
+    <div id="overlayWithdrawal" class="task-overlay">
+        <div class="msg-box text-start">
+            <h4 class="fw-bold mb-3">Withdraw</h4>
+            <div class="mb-3">
+                <label class="small fw-bold">Method</label>
+                <select class="form-control" id="wdMethod"><option>Bank</option><option>UPI</option><option>Gift Card</option></select>
+            </div>
+            <div class="mb-3"><label class="small fw-bold">Points</label><input type="number" class="form-control" id="wdPoints" placeholder="Amount"></div>
+            <div class="mb-3"><label class="small fw-bold">Details</label><input type="text" class="form-control" id="wdDetails"></div>
+            <button class="btn-main mb-2" onclick="processWithdrawal()">Submit</button>
+            <button class="btn btn-light w-100 rounded-3 py-2" onclick="closeOverlay('overlayWithdrawal')">Cancel</button>
+        </div>
+    </div>
+
+    <div id="customModal" class="task-overlay" style="z-index: 6000;">
+        <div class="msg-box">
+            <h5 id="modalTitle" class="fw-bold mb-2">Message</h5>
+            <p id="modalMessage" class="text-muted mb-4"></p>
+            <button class="btn-main py-2" onclick="document.getElementById('customModal').style.display='none'">OK</button>
+        </div>
+    </div>
+
+    <div class="bottom-bar" id="bottomNav">
+        <button class="nav-btn active" onclick="navTo('screenHome')"><i class="fas fa-home"></i>Home</button>
+        <button class="nav-btn" onclick="navTo('screenWallet')"><i class="fas fa-wallet"></i>Wallets</button>
+        <button class="nav-btn" onclick="navTo('screenProfile')"><i class="fas fa-user"></i>Profile</button>
+    </div>
+
+    <script>
+        // --- NEW FIREBASE CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyB_m0XzdMG59-BOgnKzfth1cRxsrb5Mgxk",
+            authDomain: "pedtm01.firebaseapp.com",
+            databaseURL: "https://pedtm01.firebaseio.com",
+            projectId: "pedtm01",
+            storageBucket: "pedtm01.firebasestorage.app",
+            messagingSenderId: "529500530094",
+            appId: "1:529500530094:web:fdde78067ee3137128143f"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const rdb = firebase.database();
+
+        // --- APP STATE ---
+        let currentUser = null;
+        let appConfig = {
+            socialTaskPts: 2,
+            rewardTaskPts: 3,
+            socialTaskLink: 'https://stlisttask.blogspot.com/p/reward-social-tasks.html',
+            rewardTaskLink: 'https://stlisttask.blogspot.com/p/blog-page.html'
+        };
+        let userData = {
+            wallets: { pointBalance: 0, pendingBalance: 0, dayEarning: 0, referralBalance: 0, pendingReferral: 0 },
+            level: 'Level 1',
+            dailyLimits: { clickEarn: 10, social: 5, reward: 3, checkin: 1 },
+            usage: { clickEarn: 0, social: 0, reward: 0, checkinDone: false, clickCredits: 0 },
+            referralCode: ''
+        };
+        
+        let batteryCharge = 0; // 0 to 10
+        let currentTaskContext = ''; // For the generic verification modal
+
+        const levelConfig = {
+            'Level 1': { cost: 0, click: 10, social: 5, reward: 3, maxWd: 0, fee: 0 },
+            'Level 2': { cost: 1000, click: 10, social: 6, reward: 4, maxWd: 5000, fee: 26.99 },
+            'Level 3': { cost: 5000, click: 10, social: 7, reward: 6, maxWd: 10000, fee: 24.99 },
+            'Level 4': { cost: 10000, click: 11, social: 6, reward: 4, maxWd: 20000, fee: 22.99 }
+        };
+
+        // --- INIT ---
+        function injectAds() {
+            if(window.adsInjected) return;
+            window.adsInjected = true;
+            
+            let s1 = document.createElement('script');
+            s1.dataset.zone = '10941847';
+            s1.src = 'https://nap5k.com/tag.min.js';
+            document.body.appendChild(s1);
+            
+            let s2 = document.createElement('script');
+            s2.dataset.zone = '10912576';
+            s2.src = 'https://n6wxm.com/vignette.min.js';
+            document.body.appendChild(s2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                auth.onAuthStateChanged(user => {
+                    document.getElementById('globalLoader').style.display = 'none';
+                    if(user) { 
+                        currentUser = user; 
+                        navTo('screenHome'); 
+                        loadUserData(); 
+                        injectAds(); // Load ads only after user is authenticated
+                    } else { 
+                        navTo('screenWelcome'); 
+                    }
+                });
+            }, 1000);
+            
+            document.getElementById('formLogin').addEventListener('submit', handleLogin);
+            document.getElementById('formRegister').addEventListener('submit', handleRegister);
+        });
+
+        function navTo(id) {
+            document.querySelectorAll('.app-screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const isAuth = ['screenWelcome', 'screenLogin', 'screenRegister'].includes(id);
+            document.getElementById('bottomNav').style.display = isAuth ? 'none' : 'flex';
+            
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if(id === 'screenHome') document.querySelectorAll('.nav-btn')[0].classList.add('active');
+            else if(id === 'screenWallet') document.querySelectorAll('.nav-btn')[1].classList.add('active');
+            else if(id === 'screenProfile' || id === 'screenReferral') document.querySelectorAll('.nav-btn')[2].classList.add('active');
+            
+            updateUI();
+        }
+
+        function showModal(title, msg) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = msg;
+            document.getElementById('customModal').style.display = 'flex';
+        }
+        function closeOverlay(id) { document.getElementById(id).style.display = 'none'; }
+
+        // --- AUTH LOGIC ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            document.getElementById('globalLoader').style.display = 'flex';
+            try { await auth.signInWithEmailAndPassword(document.getElementById('loginEmail').value, document.getElementById('loginPass').value); }
+            catch(err) { showModal('Error', err.message); document.getElementById('globalLoader').style.display = 'none'; }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            document.getElementById('globalLoader').style.display = 'flex';
+            try {
+                const cred = await auth.createUserWithEmailAndPassword(document.getElementById('regEmail').value, document.getElementById('regPass').value);
+                const refCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                await db.collection('users').doc(cred.user.uid).set({
+                    name: document.getElementById('regName').value, email: document.getElementById('regEmail').value,
+                    level: 'Level 1', referralCode: refCode, parentRef: document.getElementById('regRef').value || null
+                });
+                // Initialize wallets
+                await rdb.ref('users/'+cred.user.uid).set({
+                    pointBalance: 0, pendingBalance: 0, dayEarning: 0, referralBalance: 0, pendingReferral: 0,
+                    clickCredits: 0, lastEarningSync: Date.now()
+                });
+            } catch(err) { showModal('Error', err.message); document.getElementById('globalLoader').style.display = 'none'; }
+        }
+        
+        async function logout() { await auth.signOut(); navTo('screenLogin'); }
+
+        // --- DATA SYNC ---
+        function loadUserData() {
+            if(!currentUser) return;
+            const uid = currentUser.uid;
+
+            // Load Admin Config for Links and Points
+            rdb.ref('admin_config').on('value', snap => {
+                if(snap.exists()) {
+                    const cfg = snap.val();
+                    if(cfg.socialTaskPts) appConfig.socialTaskPts = cfg.socialTaskPts;
+                    if(cfg.rewardTaskPts) appConfig.rewardTaskPts = cfg.rewardTaskPts;
+                    if(cfg.socialTaskLink) appConfig.socialTaskLink = cfg.socialTaskLink;
+                    if(cfg.rewardTaskLink) appConfig.rewardTaskLink = cfg.rewardTaskLink;
+                }
+            });
+
+            db.collection('users').doc(uid).onSnapshot(doc => {
+                if(doc.exists) {
+                    const d = doc.data();
+                    userData.level = d.level || 'Level 1';
+                    userData.referralCode = d.referralCode;
+                    document.getElementById('userNameDisplay').innerText = d.name || 'User';
+                    document.getElementById('profileName').innerText = d.name || 'User';
+                    document.getElementById('profileEmail').innerText = d.email;
+                    document.getElementById('profileLevelDisplay').innerText = userData.level;
+                    document.getElementById('userMembershipDisplay').innerText = userData.level;
+                    document.getElementById('refCodeDisplay').innerText = d.referralCode;
+                    
+                    const cfg = levelConfig[userData.level];
+                    userData.dailyLimits = { clickEarn: cfg.click, social: cfg.social, reward: cfg.reward, checkin: 1 };
+                    updateUI();
+                }
+            });
+
+            rdb.ref('users/'+uid).on('value', snap => {
+                const r = snap.val() || {};
+                userData.wallets.pointBalance = r.pointBalance || 0;
+                userData.wallets.pendingBalance = r.pendingBalance || 0;
+                userData.wallets.dayEarning = r.dayEarning || 0;
+                userData.wallets.referralBalance = r.referralBalance || 0;
+                userData.wallets.pendingReferral = r.pendingReferral || 0;
+                userData.usage.clickCredits = r.clickCredits || 0;
+                
+                // Auto Sync Day Earning to Point Balance after 24 hrs logic here (Simplified for MVP)
+                const now = Date.now();
+                if(r.lastEarningSync && (now - r.lastEarningSync) > 86400000 && r.dayEarning > 0) {
+                    rdb.ref('users/'+uid).update({
+                        pointBalance: (r.pointBalance || 0) + r.dayEarning,
+                        dayEarning: 0,
+                        lastEarningSync: now
+                    });
+                }
+                
+                // Daily Usage Reset Check (Simplified)
+                const today = new Date().toISOString().slice(0, 10);
+                if(r.lastActiveDate !== today) {
+                    rdb.ref('users/'+uid).update({
+                        'usage/clickEarn': 0, 'usage/social': 0, 'usage/reward': 0, 'usage/checkinDone': false,
+                        lastActiveDate: today
+                    });
+                } else if(r.usage) {
+                    userData.usage.clickEarn = r.usage.clickEarn || 0;
+                    userData.usage.social = r.usage.social || 0;
+                    userData.usage.reward = r.usage.reward || 0;
+                    userData.usage.checkinDone = r.usage.checkinDone || false;
+                }
+                updateUI();
+            });
+        }
+
+        function updateUI() {
+            // Wallets
+            document.getElementById('mainPointBalance').innerText = userData.wallets.pointBalance;
+            document.getElementById('pendingPointBalance').innerText = userData.wallets.pendingBalance;
+            document.getElementById('dayEarningBalance').innerText = userData.wallets.dayEarning;
+            
+            document.getElementById('wMainBalance').innerText = userData.wallets.pointBalance;
+            document.getElementById('wPendingBalance').innerText = userData.wallets.pendingBalance;
+            document.getElementById('wDayEarning').innerText = userData.wallets.dayEarning;
+            document.getElementById('wRefBal').innerText = userData.wallets.referralBalance;
+            document.getElementById('wPendingRefBal').innerText = userData.wallets.pendingReferral;
+
+            // Limits
+            document.getElementById('limitClickEarn').innerText = Math.max(0, userData.dailyLimits.clickEarn - userData.usage.clickEarn);
+            document.getElementById('limitSocial').innerText = Math.max(0, userData.dailyLimits.social - userData.usage.social);
+            document.getElementById('limitReward').innerText = Math.max(0, userData.dailyLimits.reward - userData.usage.reward);
+            document.getElementById('clickEarnLimitDisplay').innerText = Math.max(0, userData.dailyLimits.clickEarn - userData.usage.clickEarn);
+            document.getElementById('clickEarnCreditsDisplay').innerText = userData.usage.clickCredits;
+        }
+
+        // --- WALLET ADD HELPER ---
+        function addWalletFunds(walletType, amount) {
+            const uid = currentUser.uid;
+            rdb.ref(`users/${uid}/${walletType}`).transaction(c => (c||0) + amount);
+        }
+        function trackUsage(type) {
+            rdb.ref(`users/${currentUser.uid}/usage/${type}`).transaction(c => (c||0) + 1);
+        }
+
+        // --- TASKS LOGIC ---
+
+        // 1. Daily Checking
+        let dcStep = 1;
+        function startDailyCheck() {
+            if(userData.usage.checkinDone) return showModal('Info', 'Daily check-in already claimed today.');
+            document.getElementById('overlayDailyChecking').style.display = 'flex';
+            dcStep = 1; updateDcUI();
+        }
+        function updateDcUI() {
+            for(let i=1; i<=4; i++) {
+                const btn = document.getElementById('dc'+i);
+                if(i < dcStep) { btn.className='btn btn-success w-100 mb-2'; btn.innerText='Completed'; btn.disabled=true; }
+                else if(i === dcStep) { btn.className='btn btn-primary w-100 mb-2'; btn.innerText='Step '+i+' - View Ad'; btn.disabled=false; }
+                else { btn.className='btn btn-secondary w-100 mb-2'; btn.innerText='Locked'; btn.disabled=true; }
+            }
+        }
+        function doDailyCheckingStep(step) {
+            // Ad implementation (Monetag SDK provided by user)
+            if(typeof show_10202760 !== 'undefined') {
+                let p = (step===2) ? show_10202760('pop') : ((step===3) ? show_10202760({type:'inApp', inAppSettings:{frequency:2,capping:0.1,interval:30,timeout:5,everyPage:false}}) : show_10202760());
+                p.then(() => { finishDcStep(step); }).catch(() => { finishDcStep(step); }); // proceed even if error in demo
+            } else { finishDcStep(step); }
+        }
+        function finishDcStep(step) {
+            if(step===4) {
+                window.open('https://stlisttask.blogspot.com/p/daily-checking.html', '_blank'); // 5s link
+                setTimeout(() => {
+                    closeOverlay('overlayDailyChecking');
+                    addWalletFunds('dayEarning', 5);
+                    rdb.ref(`users/${currentUser.uid}/usage/checkinDone`).set(true);
+                    showModal('Success', '5 Points added to Day Earning!');
+                }, 5000);
+            } else { dcStep++; updateDcUI(); }
+        }
+
+        // 2. Click & Earn
+        function doClickEarnVisit() {
+            if(userData.usage.clickEarn >= userData.dailyLimits.clickEarn) return showModal('Limit', 'Daily limit reached.');
+            window.open('https://stlisttask.blogspot.com/p/click-earn.html', '_blank');
+            document.getElementById('btnClickEarnVisit').innerText = "Wait 5s...";
+            document.getElementById('btnClickEarnVisit').disabled = true;
+            setTimeout(() => {
+                document.getElementById('btnClickEarnVisit').innerText = "Visit Link & Earn Credit";
+                document.getElementById('btnClickEarnVisit').disabled = false;
+                
+                trackUsage('clickEarn');
+                const uid = currentUser.uid;
+                rdb.ref(`users/${uid}/clickCredits`).transaction(c => {
+                    let newC = (c||0) + 1;
+                    if(newC >= 100) { addWalletFunds('pointBalance', 1); showModal('Earned', '1 Point Added to Balance!'); return 0; }
+                    return newC;
+                });
+                showModal('Credit', '1 Credit Earned!');
+            }, 5000);
+        }
+
+        // 3. Social & Reward Tasks
+        function startSocialTask() {
+            if(userData.usage.social >= userData.dailyLimits.social) return showModal('Limit', 'Daily limit reached.');
+            currentTaskContext = 'social';
+            window.open(appConfig.socialTaskLink, '_blank');
+            showTaskVerifyForm("Social Task", `Enter code from website to get ${appConfig.socialTaskPts} Points.`);
+        }
+        function startRewardTask() {
+            if(userData.usage.reward >= userData.dailyLimits.reward) return showModal('Limit', 'Daily limit reached.');
+            currentTaskContext = 'reward';
+            window.open(appConfig.rewardTaskLink, '_blank');
+            showTaskVerifyForm("Reward Task", `Enter code from website to get ${appConfig.rewardTaskPts} Points.`);
+        }
+        function showTaskVerifyForm(title, desc) {
+            document.getElementById('taskFormTitle').innerText = title;
+            document.getElementById('taskFormDesc').innerText = desc;
+            document.getElementById('taskCodeInput').value = '';
+            document.getElementById('overlayTaskForm').style.display = 'flex';
+        }
+        function submitTaskCode() {
+            const code = document.getElementById('taskCodeInput').value;
+            // Admin will manage the codes remotely via Firebase logic or standard verification API
+            // For now, any code > 2 chars simulates successful verification.
+            if(code.length > 2) {
+                closeOverlay('overlayTaskForm');
+                if(currentTaskContext === 'social') { addWalletFunds('dayEarning', appConfig.socialTaskPts); trackUsage('social'); }
+                if(currentTaskContext === 'reward') { addWalletFunds('dayEarning', appConfig.rewardTaskPts); trackUsage('reward'); }
+                showModal('Success', 'Points added to Day Earning Balance!');
+            } else { showModal('Error', 'Invalid Code'); }
+        }
+
+        // 4. Spin & Earn
+        function chargeBattery() {
+            window.open('https://stlisttask.blogspot.com/p/spin-earn.html', '_blank');
+            setTimeout(() => {
+                if(batteryCharge < 10) batteryCharge++;
+                document.getElementById('batteryLevelBar').style.width = (batteryCharge*10) + '%';
+                document.getElementById('batteryChargeText').innerText = `${batteryCharge}/10`;
+                if(batteryCharge === 10) document.getElementById('btnSpin').disabled = false;
+            }, 5000);
+        }
+        function playSpin() {
+            if(userData.wallets.referralBalance < 100) return showModal('Error', 'Need 100 Referral Points to Spin.');
+            addWalletFunds('referralBalance', -100);
+            
+            document.getElementById('btnSpin').disabled = true;
+            document.getElementById('spinWheelElement').style.transform = `rotate(${360 * 5 + Math.random() * 360}deg)`;
+            
+            setTimeout(() => {
+                const pts = Math.floor(Math.random() * 2) + 1; // 1 or 2 pts
+                addWalletFunds('dayEarning', pts);
+                showModal('Spin Complete', `You won ${pts} Points to Day Earning!`);
+                batteryCharge = 0;
+                document.getElementById('batteryLevelBar').style.width = '0%';
+                document.getElementById('batteryChargeText').innerText = `0/10`;
+            }, 3000);
+        }
+
+        // 5. Clock Click Task
+        function startClockClickTask() {
+            document.getElementById('clockStep1').style.display = 'block';
+            document.getElementById('clockStep2').style.display = 'none';
+            document.getElementById('clockCodeInput').value = '';
+            document.getElementById('overlayClockTask').style.display = 'flex';
+        }
+        function verifyClockCode() {
+            if(document.getElementById('clockCodeInput').value.length > 2) {
+                document.getElementById('clockStep1').style.display = 'none';
+                document.getElementById('clockStep2').style.display = 'block';
+                let t = 5;
+                document.getElementById('clockTimerDisplay').innerText = `0${t}`;
+                let intv = setInterval(() => {
+                    t--; document.getElementById('clockTimerDisplay').innerText = `0${t}`;
+                    if(t<=0) { clearInterval(intv); document.getElementById('btnClockFinal').disabled = false; document.getElementById('clockTimerDisplay').innerText="Ready"; }
+                }, 1000);
+            }
+        }
+        function finishClockTask() {
+            document.getElementById('btnClockFinal').disabled = true;
+            window.open('https://stlisttask.blogspot.com/p/clock-click-task.html', '_blank'); // Ads
+            let t = 30;
+            document.getElementById('clockTimerDisplay').innerText = t;
+            let intv = setInterval(() => {
+                t--; document.getElementById('clockTimerDisplay').innerText = t;
+                if(t<=0) { 
+                    clearInterval(intv); closeOverlay('overlayClockTask');
+                    addWalletFunds('pointBalance', 1); showModal('Success', '1 Point added directly to Point Balance!'); 
+                }
+            }, 1000);
+        }
+
+        // 6. Mega Offer (MyLead API Placeholder)
+        function simulateOfferComplete() {
+            // $1 = 2500 pts. Simulating a $0.5 offer = 1250 pts. Goes to pending.
+            addWalletFunds('pendingBalance', 1250);
+            showModal('Offer Completed', '1250 Points added to Pending Wallet. Needs Admin Approval (84hrs).');
+        }
+
+        // --- SUBSCRIPTION LOGIC ---
+        async function buyMembership(level) {
+            const cost = levelConfig[level].cost;
+            if(userData.wallets.referralBalance < cost) return showModal('Error', 'Insufficient Referral Points.');
+            addWalletFunds('referralBalance', -cost);
+            await db.collection('users').doc(currentUser.uid).update({ level: level });
+            showModal('Success', `Upgraded to ${level}!`);
+        }
+
+        // --- WITHDRAWAL LOGIC ---
+        function openWithdrawal() {
+            if(levelConfig[userData.level].maxWd === 0) return showModal('Locked', 'Withdrawals are locked for Level 1. Please upgrade membership using Ref Points.');
+            document.getElementById('overlayWithdrawal').style.display = 'flex';
+        }
+        function processWithdrawal() {
+            const pts = parseInt(document.getElementById('wdPoints').value);
+            if(!pts || pts <= 0) return;
+            if(userData.wallets.pointBalance < pts) return showModal('Error', 'Insufficient Point Balance.');
+            const maxWd = levelConfig[userData.level].maxWd;
+            if(pts > maxWd) return showModal('Error', `Max withdrawal for ${userData.level} is ${maxWd}.`);
+            
+            addWalletFunds('pointBalance', -pts);
+            // In real app, push to withdrawals collection with fee applied
+            closeOverlay('overlayWithdrawal');
+            showModal('Success', 'Withdrawal Request Submitted!');
+        }
+
+    </script>
+</body>
+</html>
